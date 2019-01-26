@@ -10,9 +10,10 @@ import (
 	"encoding/binary"
 
 	"blainsmith.com/go/seahash"
-	farm "github.com/dgryski/go-farm"
 	"github.com/cespare/xxhash"
+	farm "github.com/dgryski/go-farm"
 	"github.com/minio/highwayhash"
+	"github.com/spaolacci/murmur3"
 )
 
 const (
@@ -126,8 +127,8 @@ func BenchmarkXXHashUInts1(b *testing.B) {
 	r := newRand()
 	data := randUints(r)
 	idx := 0
+	buf := [8]byte{}
 	for i := 0; i < b.N; i++ {
-		buf := [8]byte{}
 		binary.LittleEndian.PutUint64(buf[:], data[idx])
 		_ = xxhash.Sum64(buf[:])
 		idx++
@@ -159,10 +160,42 @@ func BenchmarkHighwayHashUInts1(b *testing.B) {
 	r := newRand()
 	data := randUints(r)
 	idx := 0
+	buf := [32]byte{}
 	for i := 0; i < b.N; i++ {
-		buf := [32]byte{}
 		binary.LittleEndian.PutUint64(buf[:], data[idx])
 		_ = highwayhash.Sum64(nil, buf[:])
+		idx++
+		if idx >= len(data) {
+			idx = 0
+		}
+	}
+}
+
+func BenchmarkMurmur3HashString(b *testing.B) {
+	r := newRand()
+	data := randBytes(r)
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
+			idx := 0
+			for i := 0; i < b.N; i++ {
+				_ = murmur3.Sum64(data[idx][:size])
+				idx++
+				if idx >= len(data) {
+					idx = 0
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkMurmur3HashUInts1(b *testing.B) {
+	r := newRand()
+	data := randUints(r)
+	idx := 0
+	buf := [8]byte{}
+	for i := 0; i < b.N; i++ {
+		binary.LittleEndian.PutUint64(buf[:], data[idx])
+		_ = murmur3.Sum64(buf[:])
 		idx++
 		if idx >= len(data) {
 			idx = 0
